@@ -1,0 +1,564 @@
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<testplan name="apb_spec.pdf_verification" version="1.0">
+    <metadata>
+        <author>VEGA XTP Generator</author>
+        <methodology>Cognitive Verification Architecture</methodology>
+        <book>Cognitive Verification Architecture: The VEGA Framework by Vikash</book>
+        <source>apb_spec.pdf</source>
+    </metadata>
+    
+    <requirements>
+        <requirement id="REQ_001" source="page 1-14">APB protocol is a low-cost interface optimized for minimal power consumption and reduced interface complexity</requirement>
+        <requirement id="REQ_002" source="page 1-14">APB interface is not pipelined and is a simple, synchronous protocol</requirement>
+        <requirement id="REQ_003" source="page 1-14">Every transfer takes at least two cycles to complete</requirement>
+        <requirement id="REQ_004" source="page 2-16">PADDR can be up to 32 bits wide</requirement>
+        <requirement id="REQ_005" source="page 2-17">PADDR indicates a byte address</requirement>
+        <requirement id="REQ_006" source="page 2-17">PADDR is permitted to be unaligned with respect to data width but result is UNPREDICTABLE</requirement>
+        <requirement id="REQ_007" source="page 2-18">APB protocol has two independent data buses - read and write</requirement>
+        <requirement id="REQ_008" source="page 2-18">Data buses can be 8, 16, or 32 bits wide</requirement>
+        <requirement id="REQ_009" source="page 2-18">Read and write data buses must have the same width</requirement>
+        <requirement id="REQ_010" source="page 3-20">Setup phase occurs when PSEL is asserted</requirement>
+        <requirement id="REQ_011" source="page 3-20">Access phase occurs when PENABLE is asserted</requirement>
+        <requirement id="REQ_012" source="page 3-20">PADDR, PWRITE and PWDATA must be valid during Setup phase</requirement>
+        <requirement id="REQ_013" source="page 3-21">PREADY extends transfer when driven LOW during Access phase</requirement>
+        <requirement id="REQ_014" source="page 3-21">Address, direction, select, enable, write data, write strobe, protection and user signals must remain unchanged while PREADY is LOW</requirement>
+        <requirement id="REQ_015" source="page 3-22">PSTRB enables sparse data transfer on write data bus</requirement>
+        <requirement id="REQ_016" source="page 3-22">Each PSTRB corresponds to 1 byte of write data bus</requirement>
+        <requirement id="REQ_017" source="page 3-22">PSTRB[n] corresponds to PWDATA[(8n+7):(8n)]</requirement>
+        <requirement id="REQ_018" source="page 3-22">PSTRB must be LOW during read transfers</requirement>
+        <requirement id="REQ_019" source="page 3-25">PSLVERR indicates error condition on APB transfer</requirement>
+        <requirement id="REQ_020" source="page 3-25">PSLVERR is only valid during last cycle when PSEL, PENABLE and PREADY are HIGH</requirement>
+        <requirement id="REQ_021" source="page 3-27">PPROT[2:0] provides three levels of access protection</requirement>
+        <requirement id="REQ_022" source="page 3-28">PWAKEUP indicates activity associated with APB interface</requirement>
+        <requirement id="REQ_023" source="page 4-32">APB interface operates through IDLE, SETUP and ACCESS states</requirement>
+        <requirement id="REQ_024" source="page 4-32">Interface remains in SETUP state for only one clock cycle</requirement>
+        <requirement id="REQ_025" source="page 4-32">PREADY controls exit from ACCESS state</requirement>
+        <requirement id="REQ_026" source="page 5-34">Parity protection detects single-bit errors on interface</requirement>
+        <requirement id="REQ_027" source="page 5-36">Odd parity is used for check signals</requirement>
+        <requirement id="REQ_028" source="page 5-36">Each parity check bit covers no more than 8 bits of payload</requirement>
+    </requirements>
+    
+    <test_suite name="basic_protocol_tests">
+        <test_case id="TC_001" name="basic_write_no_wait_states">
+            <objective>Verify basic write transfer with no wait states completes in exactly 2 cycles</objective>
+            <source>Page 3-20, Figure 3-1</source>
+            <preconditions>
+                <condition>APB interface in IDLE state</condition>
+                <condition>PREADY tied HIGH</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Assert PSEL with valid PADDR, PWRITE=1, PWDATA</step>
+                <step order="2">Assert PENABLE in next cycle</step>
+                <step order="3">Deassert PENABLE and PSEL after PREADY HIGH</step>
+            </stimulus>
+            <expected_results>
+                <result>Transfer completes in exactly 2 cycles</result>
+                <result>PREADY sampled HIGH during Access phase</result>
+            </expected_results>
+            <pass_criteria>Write data accepted at T3, signals stable during transfer</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_002" name="basic_read_no_wait_states">
+            <objective>Verify basic read transfer with no wait states</objective>
+            <source>Page 3-23, Figure 3-4</source>
+            <preconditions>
+                <condition>APB interface in IDLE state</condition>
+                <condition>PREADY tied HIGH</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Assert PSEL with valid PADDR, PWRITE=0</step>
+                <step order="2">Assert PENABLE in next cycle</step>
+                <step order="3">Sample PRDATA when PREADY HIGH</step>
+            </stimulus>
+            <expected_results>
+                <result>Valid PRDATA available before end of transfer</result>
+                <result>Transfer completes in 2 cycles</result>
+            </expected_results>
+            <pass_criteria>PRDATA valid and stable when PREADY asserted</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_003" name="write_with_wait_states">
+            <objective>Verify write transfer with wait states extends correctly</objective>
+            <source>Page 3-21, Figure 3-2</source>
+            <preconditions>
+                <condition>APB interface in IDLE state</condition>
+                <condition>PREADY can be controlled</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Assert PSEL with valid PADDR, PWRITE=1, PWDATA</step>
+                <step order="2">Assert PENABLE, drive PREADY LOW</step>
+                <step order="3">Keep PREADY LOW for N cycles</step>
+                <step order="4">Drive PREADY HIGH to complete transfer</step>
+            </stimulus>
+            <expected_results>
+                <result>Transfer extends for N additional cycles</result>
+                <result>All control signals remain stable during wait states</result>
+            </expected_results>
+            <pass_criteria>PADDR, PWRITE, PSEL, PENABLE, PWDATA unchanged while PREADY LOW</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_004" name="read_with_wait_states">
+            <objective>Verify read transfer with wait states</objective>
+            <source>Page 3-23, Figure 3-5</source>
+            <preconditions>
+                <condition>APB interface in IDLE state</condition>
+                <condition>PREADY can be controlled</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Assert PSEL with valid PADDR, PWRITE=0</step>
+                <step order="2">Assert PENABLE, drive PREADY LOW</step>
+                <step order="3">Keep PREADY LOW for N cycles</step>
+                <step order="4">Drive PREADY HIGH with valid PRDATA</step>
+            </stimulus>
+            <expected_results>
+                <result>Transfer extends for N additional cycles</result>
+                <result>PRDATA valid when PREADY asserted</result>
+            </expected_results>
+            <pass_criteria>Control signals stable, PRDATA valid at completion</pass_criteria>
+        </test_case>
+    </test_suite>
+
+    <test_suite name="state_machine_tests">
+        <test_case id="TC_005" name="idle_to_setup_transition">
+            <objective>Verify state transition from IDLE to SETUP</objective>
+            <source>Page 4-32, Figure 4-1</source>
+            <preconditions>
+                <condition>APB interface in IDLE state</condition>
+                <condition>PSELx = 0, PENABLE = 0</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Assert PSELx when transfer required</step>
+            </stimulus>
+            <expected_results>
+                <result>Interface moves to SETUP state</result>
+                <result>PSELx = 1, PENABLE = 0</result>
+            </expected_results>
+            <pass_criteria>State transition occurs in single cycle</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_006" name="setup_to_access_transition">
+            <objective>Verify mandatory transition from SETUP to ACCESS</objective>
+            <source>Page 4-32, Figure 4-1</source>
+            <preconditions>
+                <condition>APB interface in SETUP state</condition>
+                <condition>PSELx = 1, PENABLE = 0</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Wait one clock cycle</step>
+            </stimulus>
+            <expected_results>
+                <result>Interface moves to ACCESS state</result>
+                <result>PSELx = 1, PENABLE = 1</result>
+            </expected_results>
+            <pass_criteria>Transition occurs automatically after one cycle</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_007" name="access_to_idle_transition">
+            <objective>Verify transition from ACCESS to IDLE when no further transfers</objective>
+            <source>Page 4-32, Figure 4-1</source>
+            <preconditions>
+                <condition>APB interface in ACCESS state</condition>
+                <condition>PSELx = 1, PENABLE = 1</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Assert PREADY HIGH</step>
+                <step order="2">No further transfers required</step>
+            </stimulus>
+            <expected_results>
+                <result>Interface returns to IDLE state</result>
+                <result>PSELx = 0, PENABLE = 0</result>
+            </expected_results>
+            <pass_criteria>Clean transition to IDLE when PREADY HIGH and no transfer</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_008" name="access_to_setup_transition">
+            <objective>Verify direct transition from ACCESS to SETUP for back-to-back transfers</objective>
+            <source>Page 4-32, Figure 4-1</source>
+            <preconditions>
+                <condition>APB interface in ACCESS state</condition>
+                <condition>PSELx = 1, PENABLE = 1</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Assert PREADY HIGH</step>
+                <step order="2">Another transfer follows immediately</step>
+            </stimulus>
+            <expected_results>
+                <result>Interface moves directly to SETUP state</result>
+                <result>PSELx = 1, PENABLE = 0 in next cycle</result>
+            </expected_results>
+            <pass_criteria>No IDLE state entered between transfers</pass_criteria>
+        </test_case>
+    </test_suite>
+
+    <test_suite name="write_strobe_tests">
+        <test_case id="TC_009" name="byte_lane_write_strobes">
+            <objective>Verify PSTRB enables correct byte lanes during write</objective>
+            <source>Page 3-22, Figure 3-3</source>
+            <preconditions>
+                <condition>32-bit data bus configured</condition>
+                <condition>PSTRB signal present</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Perform write with PSTRB[3:0] = 4'b1010</step>
+                <step order="2">Check only bytes 3 and 1 are updated</step>
+            </stimulus>
+            <expected_results>
+                <result>Only PWDATA[31:24] and PWDATA[15:8] affect memory</result>
+                <result>PWDATA[23:16] and PWDATA[7:0] ignored</result>
+            </expected_results>
+            <pass_criteria>Byte lane mapping PSTRB[n] to PWDATA[(8n+7):(8n)] correct</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_010" name="pstrb_low_during_read">
+            <objective>Verify PSTRB must be LOW during read transfers</objective>
+            <source>Page 3-22</source>
+            <preconditions>
+                <condition>PSTRB signal present</condition>
+                <condition>Read operation configured</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Initiate read transfer with PWRITE=0</step>
+                <step order="2">Drive PSTRB with any non-zero value</step>
+            </stimulus>
+            <expected_results>
+                <result>Protocol violation detected</result>
+                <result>PSTRB must be driven LOW for reads</result>
+            </expected_results>
+            <pass_criteria>PSTRB = 0 during all read operations</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_011" name="pstrb_compatibility_matrix">
+            <objective>Verify PSTRB presence compatibility between Requester and Completer</objective>
+            <source>Page 3-22, Table 3-1</source>
+            <preconditions>
+                <condition>Different PSTRB configurations available</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Test Requester without PSTRB, Completer without PSTRB</step>
+                <step order="2">Test Requester without PSTRB, Completer with PSTRB</step>
+                <step order="3">Test Requester with PSTRB, Completer without PSTRB</step>
+                <step order="4">Test Requester with PSTRB, Completer with PSTRB</step>
+            </stimulus>
+            <expected_results>
+                <result>All combinations work as per compatibility matrix</result>
+                <result>Tie PSTRB to PWRITE when needed</result>
+            </expected_results>
+            <pass_criteria>Compatibility matches Table 3-1 specifications</pass_criteria>
+        </test_case>
+    </test_suite>
+
+    <test_suite name="error_response_tests">
+        <test_case id="TC_012" name="write_error_response">
+            <objective>Verify PSLVERR assertion during write transfer error</objective>
+            <source>Page 3-25, Figure 3-6</source>
+            <preconditions>
+                <condition>PSLVERR signal present</condition>
+                <condition>Error condition can be simulated</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Initiate write transfer to invalid address</step>
+                <step order="2">Assert PSLVERR during last cycle of transfer</step>
+            </stimulus>
+            <expected_results>
+                <result>PSLVERR HIGH when PSEL, PENABLE, PREADY all HIGH</result>
+                <result>Error response properly signaled</result>
+            </expected_results>
+            <pass_criteria>PSLVERR valid only during last cycle of transfer</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_013" name="read_error_response">
+            <objective>Verify PSLVERR assertion during read transfer error</objective>
+            <source>Page 3-26, Figure 3-7</source>
+            <preconditions>
+                <condition>PSLVERR signal present</condition>
+                <condition>Error condition can be simulated</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Initiate read transfer to invalid address</step>
+                <step order="2">Assert PSLVERR during last cycle</step>
+            </stimulus>
+            <expected_results>
+                <result>PSLVERR HIGH indicates no valid read data</result>
+                <result>PRDATA may contain invalid data</result>
+            </expected_results>
+            <pass_criteria>Error properly signaled, PRDATA not guaranteed valid</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_014" name="pslverr_timing_validation">
+            <objective>Verify PSLVERR timing requirements</objective>
+            <source>Page 3-25</source>
+            <preconditions>
+                <condition>PSLVERR signal present</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Assert PSLVERR when PSEL=0</step>
+                <step order="2">Assert PSLVERR when PENABLE=0</step>
+                <step order="3">Assert PSLVERR when PREADY=0</step>
+                <step order="4">Assert PSLVERR when PSEL=PENABLE=PREADY=1</step>
+            </stimulus>
+            <expected_results>
+                <result>PSLVERR ignored in first three cases</result>
+                <result>PSLVERR valid only in fourth case</result>
+            </expected_results>
+            <pass_criteria>PSLVERR timing strictly enforced per specification</pass_criteria>
+        </test_case>
+    </test_suite>
+
+    <test_suite name="protection_tests">
+        <test_case id="TC_015" name="pprot_normal_privileged">
+            <objective>Verify PPROT[0] normal/privileged indication</objective>
+            <source>Page 3-27, Table 3-2</source>
+            <preconditions>
+                <condition>PPROT signal present</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Perform transfer with PPROT[0]=0 (normal)</step>
+                <step order="2">Perform transfer with PPROT[0]=1 (privileged)</step>
+            </stimulus>
+            <expected_results>
+                <result>Normal access has lower privilege level</result>
+                <result>Privileged access has higher privilege level</result>
+            </expected_results>
+            <pass_criteria>Access protection levels correctly differentiated</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_016" name="pprot_secure_nonsecure">
+            <objective>Verify PPROT[1] secure/non-secure indication</objective>
+            <source>Page 3-27, Table 3-2</source>
+            <preconditions>
+                <condition>PPROT signal present</condition>
+                <condition>Security differentiation required</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Perform transfer with PPROT[1]=0 (secure)</step>
+                <step order="2">Perform transfer with PPROT[1]=1 (non-secure)</step>
+            </stimulus>
+            <expected_results>
+                <result>Secure access has secure privileges</result>
+                <result>Non-secure access has limited privileges</result>
+            </expected_results>
+            <pass_criteria>Security level correctly indicated and enforced</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_017" name="pprot_data_instruction">
+            <objective>Verify PPROT[2] data/instruction access indication</objective>
+            <source>Page 3-27, Table 3-2</source>
+            <preconditions>
+                <condition>PPROT signal present</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Perform transfer with PPROT[2]=0 (data access)</step>
+                <step order="2">Perform transfer with PPROT[2]=1 (instruction access)</step>
+            </stimulus>
+            <expected_results>
+                <result>Data access hint provided correctly</result>
+                <result>Instruction access hint provided correctly</result>
+            </expected_results>
+            <pass_criteria>Access type hints correctly indicated</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_018" name="pprot_compatibility_matrix">
+            <objective>Verify PPROT compatibility between Requester and Completer</objective>
+            <source>Page 3-27, Table 3-3</source>
+            <preconditions>
+                <condition>Different PPROT configurations available</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Test all PPROT presence/absence combinations</step>
+            </stimulus>
+            <expected_results>
+                <result>Compatibility matches specification matrix</result>
+                <result>Fixed protection attributes work when specified</result>
+            </expected_results>
+            <pass_criteria>All combinations work per Table 3-3</pass_criteria>
+        </test_case>
+    </test_suite>
+
+    <test_suite name="wakeup_signaling_tests">
+        <test_case id="TC_019" name="pwakeup_basic_functionality">
+            <objective>Verify PWAKEUP indicates APB interface activity</objective>
+            <source>Page 3-28, Table 3-4</source>
+            <preconditions>
+                <condition>PWAKEUP signal present</condition>
+                <condition>Wakeup_Signal property True</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Assert PWAKEUP before PSELx assertion</step>
+                <step order="2">Keep PWAKEUP asserted during transfer</step>
+                <step order="3">Deassert PWAKEUP when no activity</step>
+            </stimulus>
+            <expected_results>
+                <result>PWAKEUP properly indicates interface activity</result>
+                <result>Signal suitable for clock controller routing</result>
+            </expected_results>
+            <pass_criteria>PWAKEUP glitch-free and properly timed</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_020" name="pwakeup_timing_rules">
+            <objective>Verify PWAKEUP timing rules and recommendations</objective>
+            <source>Page 3-28</source>
+            <preconditions>
+                <condition>PWAKEUP signal present</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Assert PWAKEUP before PSELx (recommended)</step>
+                <step order="2">Keep PWAKEUP HIGH until PREADY asserted</step>
+                <step order="3">Test PWAKEUP assertion during PSELx</step>
+                <step order="4">Test PWAKEUP assertion after PSELx</step>
+            </stimulus>
+            <expected_results>
+                <result>Early PWAKEUP assertion prevents delays</result>
+                <result>PWAKEUP must remain until PREADY if asserted with PSELx</result>
+            </expected_results>
+            <pass_criteria>All timing rules and recommendations followed</pass_criteria>
+        </test_case>
+    </test_suite>
+
+    <test_suite name="user_signaling_tests">
+        <test_case id="TC_021" name="pauser_signal_validity">
+            <objective>Verify PAUSER user request attribute timing</objective>
+            <source>Page 3-29, Table 3-5</source>
+            <preconditions>
+                <condition>PAUSER signal present</condition>
+                <condition>USER_REQ_WIDTH > 0</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Assert PSELx with valid PAUSER</step>
+                <step order="2">Verify PAUSER stable in Setup and Access phases</step>
+                <step order="3">Check PAUSER constant during wait states</step>
+            </stimulus>
+            <expected_results>
+                <result>PAUSER valid when PSELx asserted</result>
+                <result>PAUSER constant throughout transfer</result>
+            </expected_results>
+            <pass_criteria>PAUSER timing requirements met per specification</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_022" name="pwuser_signal_validity">
+            <objective>Verify PWUSER write data attribute timing</objective>
+            <source>Page 3-29, Table 3-5</source>
+            <preconditions>
+                <condition>PWUSER signal present</condition>
+                <condition>USER_DATA_WIDTH > 0</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Perform write with PSEL and PWRITE asserted</step>
+                <step order="2">Verify PWUSER stable in Setup and Access phases</step>
+            </stimulus>
+            <expected_results>
+                <result>PWUSER valid when PSEL and PWRITE asserted</result>
+                <result>PWUSER constant throughout write transfer</result>
+            </expected_results>
+            <pass_criteria>PWUSER timing requirements satisfied</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_023" name="pruser_signal_validity">
+            <objective>Verify PRUSER read data attribute timing</objective>
+            <source>Page 3-29, Table 3-5</source>
+            <preconditions>
+                <condition>PRUSER signal present</condition>
+                <condition>USER_DATA_WIDTH > 0</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Perform read with PSEL asserted, PWRITE deasserted</step>
+                <step order="2">Check PRUSER valid when PENABLE and PREADY HIGH</step>
+            </stimulus>
+            <expected_results>
+                <result>PRUSER valid when PSEL, PENABLE, PREADY asserted and PWRITE deasserted</result>
+            </expected_results>
+            <pass_criteria>PRUSER timing matches read data timing</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_024" name="pbuser_signal_validity">
+            <objective>Verify PBUSER response attribute timing</objective>
+            <source>Page 3-29, Table 3-5</source>
+            <preconditions>
+                <condition>PBUSER signal present</condition>
+                <condition>USER_RESP_WIDTH > 0</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Perform any transfer</step>
+                <step order="2">Check PBUSER valid when PSEL, PENABLE, PREADY all HIGH</step>
+            </stimulus>
+            <expected_results>
+                <result>PBUSER valid during response phase of transfer</result>
+            </expected_results>
+            <pass_criteria>PBUSER timing matches response timing</pass_criteria>
+        </test_case>
+    </test_suite>
+
+    <test_suite name="parity_protection_tests">
+        <test_case id="TC_025" name="odd_parity_generation">
+            <objective>Verify odd parity generation for interface signals</objective>
+            <source>Page 5-36</source>
+            <preconditions>
+                <condition>Check_Type property set to Odd_Parity_Byte_All</condition>
+                <condition>Parity check signals present</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Drive various data patterns on interface signals</step>
+                <step order="2">Verify parity signals maintain odd parity</step>
+            </stimulus>
+            <expected_results>
+                <result>Always odd number of bits asserted across signal and check signal</result>
+                <result>Each parity bit covers maximum 8 payload bits</result>
+            </expected_results>
+            <pass_criteria>Odd parity maintained for all signal patterns</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_026" name="parity_check_signals">
+            <objective>Verify all parity check signals according to specification</objective>
+            <source>Page 5-38, Table 5-1</source>
+            <preconditions>
+                <condition>All check signals present</condition>
+                <condition>Check_Type property configured</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Exercise all interface signals with parity checks</step>
+                <step order="2">Verify check signal widths and granularity</step>
+                <step order="3">Validate Check Enable conditions</step>
+            </stimulus>
+            <expected_results>
+                <result>All check signals match Table 5-1 specifications</result>
+                <result>Check Enable conditions properly enforced</result>
+            </expected_results>
+            <pass_criteria>Parity check implementation matches specification exactly</pass_criteria>
+        </test_case>
+
+        <test_case id="TC_027" name="single_bit_error_detection">
+            <objective>Verify single-bit error detection capability</objective>
+            <source>Page 5-34</source>
+            <preconditions>
+                <condition>Parity protection enabled</condition>
+                <condition>Error injection capability available</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Inject single-bit errors in various signals</step>
+                <step order="2">Verify parity check detects errors</step>
+            </stimulus>
+            <expected_results>
+                <result>All single-bit errors detected by parity check</result>
+                <result>Multi-bit errors in different groups detected</result>
+            </expected_results>
+            <pass_criteria>Single-bit error detection rate 100%</pass_criteria>
+        </test_case>
+    </test_suite>
+
+    <test_suite name="signal_validity_tests">
+        <test_case id="TC_028" name="always_valid_signals">
+            <objective>Verify signals that must always be valid</objective>
+            <source>Page A-40</source>
+            <preconditions>
+                <condition>All required signals connected</condition>
+            </preconditions>
+            <stimulus>
+                <step order="1">Monitor PSEL and PWAKEUP throughout operation</step>
+            </stimulus>
+            <expected_results>
+                <result>PSEL and PWAKEUP always have valid values</result>
+            </expected_results>
+            <pass_criteria>No X or Z values on always-valid signals</pass_criteria>
+        </test_case>
+
+        <test_case
